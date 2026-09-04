@@ -1,5 +1,7 @@
 # Zynode Lab
 
+CA: 0x7ee6f7f242b459DBb260912cdCd2F7b89245FE25
+
 Zynode Lab is a zero-runtime-dependency command-line toolkit for **Robinhood Chain** developers. It focuses on deterministic EVM contract deployment, exact CREATE and CREATE2 address prediction, recipe diagnostics, EIP-55 checksums, explorer links, and optional JSON-RPC checks against Robinhood Chain mainnet or testnet.
 
 The tool is designed to be useful in deployment scripts, CI, audits, release checklists, and local development without requiring a wallet or private key.

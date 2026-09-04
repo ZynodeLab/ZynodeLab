@@ -1,5 +1,7 @@
 # Zynode Lab
 
+uBBKPVAbtGkVdg9Vz2T2XXQx1eHiwmEZW88pXjvpump
+
 Zynode Lab is an offline, zero-runtime-dependency Solana PDA engineering tool. It is built for the part of PDA work that usually causes bugs: exact seed bytes, canonical bump selection, cross-language encoding, and seed schemes that look different in source code but hash to the same effective payload.
 
 The repository ships a CLI and reusable ES modules. It does not contain a website, wallet connector, RPC client, database, telemetry SDK, or hosted API.

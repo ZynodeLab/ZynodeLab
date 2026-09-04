@@ -1,72 +1,73 @@
-const HEX = /^[0-9a-f]+$/i;
+const HEX_RE = /^[0-9a-f]*$/i;
 
-export function concatBytes(chunks) {
-  if (!Array.isArray(chunks)) throw new TypeError('concatBytes expects an array of Uint8Array values.');
+export function strip0x(value) {
+  if (typeof value !== 'string') throw new TypeError('Expected a string.');
+  return value.trim().replace(/^0x/i, '');
+}
+
+export function assertHex(value, label = 'hex value') {
+  const clean = strip0x(value);
+  if (!HEX_RE.test(clean)) throw new Error(`${label} contains non-hexadecimal characters.`);
+  return clean;
+}
+
+export function hexToBytes(value, { allowOdd = false } = {}) {
+  let clean = assertHex(value);
+  if (clean.length % 2 !== 0) {
+    if (!allowOdd) throw new Error('Hex input must contain an even number of characters.');
+    clean = `0${clean}`;
+  }
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i += 1) out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+export function bytesToHex(bytes, prefix = true) {
+  if (!(bytes instanceof Uint8Array)) throw new TypeError('Expected Uint8Array.');
+  const value = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return prefix ? `0x${value}` : value;
+}
+
+export function concatBytes(...chunks) {
+  const flattened = chunks.length === 1 && Array.isArray(chunks[0]) ? chunks[0] : chunks;
   let total = 0;
-  for (const chunk of chunks) {
-    if (!(chunk instanceof Uint8Array)) throw new TypeError('concatBytes only accepts Uint8Array values.');
+  for (const chunk of flattened) {
+    if (!(chunk instanceof Uint8Array)) throw new TypeError('concatBytes accepts Uint8Array values only.');
     total += chunk.length;
   }
-  const output = new Uint8Array(total);
+  const out = new Uint8Array(total);
   let offset = 0;
-  for (const chunk of chunks) {
-    output.set(chunk, offset);
+  for (const chunk of flattened) {
+    out.set(chunk, offset);
     offset += chunk.length;
   }
-  return output;
+  return out;
 }
 
-export function bytesToHex(bytes, separator = '') {
-  if (!(bytes instanceof Uint8Array)) throw new TypeError('bytesToHex expects a Uint8Array.');
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join(separator);
+export function utf8ToBytes(value) {
+  return new TextEncoder().encode(String(value));
 }
 
-export function hexToBytes(value) {
-  if (typeof value !== 'string') throw new TypeError('hexToBytes expects a string.');
-  const normalized = value.trim().replace(/^0x/i, '').replace(/\s+/g, '');
-  if (normalized.length % 2 !== 0) throw new Error('Hex input must contain an even number of characters.');
-  if (normalized.length > 0 && !HEX.test(normalized)) throw new Error('Hex input contains invalid characters.');
-  const bytes = new Uint8Array(normalized.length / 2);
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
-  }
-  return bytes;
+export function bigintToMinimalBytes(value) {
+  const number = typeof value === 'bigint' ? value : BigInt(value);
+  if (number < 0n) throw new Error('Negative integers are not supported.');
+  if (number === 0n) return new Uint8Array();
+  let hex = number.toString(16);
+  if (hex.length % 2 !== 0) hex = `0${hex}`;
+  return hexToBytes(hex);
 }
 
-export function equalBytes(left, right) {
-  if (!(left instanceof Uint8Array) || !(right instanceof Uint8Array)) return false;
-  if (left.length !== right.length) return false;
-  let difference = 0;
-  for (let index = 0; index < left.length; index += 1) difference |= left[index] ^ right[index];
-  return difference === 0;
+export function leftPadBytes(bytes, length) {
+  if (!(bytes instanceof Uint8Array)) throw new TypeError('Expected Uint8Array.');
+  if (bytes.length > length) throw new Error(`Value is ${bytes.length} bytes; maximum is ${length}.`);
+  const out = new Uint8Array(length);
+  out.set(bytes, length - bytes.length);
+  return out;
 }
 
-export function firstByteDifference(left, right) {
-  if (!(left instanceof Uint8Array) || !(right instanceof Uint8Array)) {
-    throw new TypeError('firstByteDifference expects Uint8Array values.');
-  }
-  const limit = Math.min(left.length, right.length);
-  for (let index = 0; index < limit; index += 1) {
-    if (left[index] !== right[index]) {
-      return { index, left: left[index], right: right[index] };
-    }
-  }
-  if (left.length !== right.length) {
-    return {
-      index: limit,
-      left: left.length > limit ? left[limit] : null,
-      right: right.length > limit ? right[limit] : null,
-    };
-  }
-  return null;
-}
-
-export function boundariesFor(chunks) {
-  const boundaries = [];
-  let offset = 0;
-  for (const chunk of chunks) {
-    offset += chunk.length;
-    boundaries.push(offset);
-  }
-  return boundaries;
+export function equalBytes(a, b) {
+  if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a[i] ^ b[i];
+  return diff === 0;
 }

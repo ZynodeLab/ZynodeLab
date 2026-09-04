@@ -1,25 +1,16 @@
 # Changelog
 
-## 1.2.0
+## 2.0.0 - 2026-09-05
 
-- Added canonical bump tracing with per-attempt SHA-256 candidate digests.
-- Added CI-friendly PDA verification with distinct mismatch exit status.
-- Added typed-recipe and effective-payload fingerprints.
-- Added recipe diagnostics for Unicode normalization and variable-width seed boundaries.
-- Added JSON recipe comparison with segmentation-equivalence detection.
-- Split CLI parsing, rendering, recipe loading, and command routing into focused modules.
-- Added byte framing/equality helpers and structured Zynode errors.
-- Expanded the automated suite to cover CLI behavior, recipe fingerprints, diagnostics, byte utilities, and curve checks.
-- Strengthened repository checks to enforce the offline, zero-runtime-dependency boundary.
-- Rewrote tool documentation around exact-byte debugging and repository-only usage.
-
-## 1.1.0
-
-- Converted Zynode Lab to a CLI-only repository.
-- Removed website and hosting code.
-- Added derive, inspect, bumps, and code commands.
-- Added JSON output and reusable ES-module exports.
-
-## 1.0.0
-
-- Initial PDA derivation engine, seed utilities, bump exploration, code generation, tests, and repository policies.
+- Rebuilt Zynode Lab for Robinhood Chain and standard EVM development.
+- Added Robinhood Chain mainnet and testnet configuration.
+- Added local Keccak-256 implementation with standard vectors.
+- Added EIP-55 address checksums and inspection.
+- Added CREATE address prediction using canonical RLP encoding.
+- Added CREATE2 prediction from deployer, salt, init code, or init code hash.
+- Added CREATE2 recipe diagnostics, fingerprints, comparison, and verification.
+- Added Solidity, ethers, Foundry, and package-native code generation.
+- Added optional read-only JSON-RPC network and contract inspection commands.
+- Added Robinhood Chain explorer-link generation.
+- Added comprehensive tests and CI workflows.
+- Removed the previous chain-specific derivation implementation and related terminology.

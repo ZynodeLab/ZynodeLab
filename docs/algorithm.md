@@ -1,49 +1,50 @@
-# PDA algorithm notes
+# Deterministic EVM address algorithms
 
-A Solana Program Derived Address is computed from ordered seed bytes and a program ID, then rejected if the resulting 32-byte hash can be decompressed as an Ed25519 curve point.
+Zynode Lab implements two deterministic contract-address paths used by EVM chains, including Robinhood Chain.
 
-## Candidate construction
+## CREATE
 
-For a specific seed list:
-
-1. Validate no seed is longer than 32 bytes.
-2. Validate no more than 16 total seeds are supplied.
-3. Decode the program ID to exactly 32 bytes.
-4. Hash each seed in order.
-5. Hash the program ID and the bytes of `ProgramDerivedAddress` after the seeds.
-6. Interpret the 32-byte SHA-256 result as a compressed Ed25519 point candidate.
-7. Reject the candidate if it is on-curve.
-8. Encode an off-curve digest as base58 to obtain the PDA.
-
-Zynode's implementation builds the same effective concatenated SHA-256 preimage in one byte buffer. SHA-256 streaming updates and hashing the concatenated bytes are equivalent.
-
-## Canonical bump
-
-Canonical derivation adds a one-byte bump as the last seed. Search starts at 255 and decrements until an off-curve candidate is found.
-
-Because the bump occupies one of Solana's 16 seed slots, Zynode permits at most 15 user seeds in canonical derivation mode.
-
-`zynode trace` stops at the first valid bump and reports every preceding rejected digest. `zynode bumps` evaluates the complete 255-to-0 range.
-
-## Exact bytes
-
-These values are different PDA inputs:
+The CREATE address is derived from the deployer address and deployer nonce:
 
 ```text
-string "123"      -> 31 32 33
-u64 LE 123         -> 7b 00 00 00 00 00 00 00
-u32 BE 123         -> 00 00 00 7b
+address = last20(keccak256(rlp([deployer, nonce])))
 ```
 
-The CLI exposes bytes before derivation so a mismatch can be found before comparing addresses.
+The deployer is exactly 20 bytes. The nonce is encoded as a canonical non-negative RLP integer.
 
-## Seed-boundary equivalence
+## CREATE2
 
-The protocol does not prefix each seed with a length inside the PDA hash. As a result, different seed arrays can contribute the same concatenated bytes. This is why Zynode keeps seed-boundary diagnostics separate from ordinary seed validation.
+CREATE2 removes nonce dependence and adds a caller-selected 32-byte salt plus the hash of initialization code:
 
-See `seed-boundaries.md` for the dedicated comparison workflow.
+```text
+address = last20(
+  keccak256(
+    0xff ++ deployer ++ salt ++ keccak256(init_code)
+  )
+)
+```
 
-## References
+The final CREATE2 preimage is exactly 85 bytes:
 
-- https://solana.com/docs/core/pda
-- https://docs.rs/solana-sdk/latest/solana_sdk/pubkey/struct.Pubkey.html
+```text
+1 byte   0xff domain separator
+20 bytes deployer
+32 bytes salt
+32 bytes init code hash
+```
+
+A shorter hex salt supplied to the CLI is left-padded to 32 bytes. `utf8:TEXT` is UTF-8 encoded and then left-padded. Inputs larger than 32 bytes are rejected.
+
+## Keccak-256
+
+EVM address derivation uses Keccak-256, not standardized SHA3-256. The implementation in `src/lib/keccak.js` uses a 1600-bit state, 1088-bit rate, Keccak padding suffix `0x01`, and 24 Keccak-f rounds.
+
+The test suite contains well-known empty-string and `abc` vectors.
+
+## Checksummed addresses
+
+Display addresses use EIP-55 mixed-case checksums. Derivation operates on raw 20-byte addresses, so casing does not affect the result.
+
+## Chain relationship
+
+CREATE and CREATE2 are EVM rules and do not include chain ID in their preimages. This means the same deployment inputs can produce the same address on multiple EVM chains. Zynode's Robinhood Chain integration is used for network configuration, explorer links, and optional RPC verification.

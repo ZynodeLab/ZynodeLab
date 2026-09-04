@@ -1,25 +1,26 @@
 # Security policy
 
-## Scope
+Zynode Lab is a deterministic deployment and read-only network inspection tool for Robinhood Chain.
 
-Zynode Lab is an offline derivation tool. Its main security property is correctness: the same validated program ID and seed bytes must produce the same PDA behavior as Solana's program-address algorithm.
+## Security boundaries
 
-High-impact bug classes include:
+The project does not require or process private keys, seed phrases, signing payloads, or wallet credentials. Do not add secrets to CLI arguments, recipes, fixtures, issue reports, or logs.
 
-- incorrect seed encoding;
-- accepting an invalid program ID;
-- incorrect Ed25519 on-curve detection;
-- selecting a non-canonical bump;
-- displaying bytes that differ from the bytes actually derived;
-- generated code that does not reproduce the inspected recipe;
-- recipe comparison that incorrectly claims byte equivalence.
+Correctness-sensitive areas include:
+
+- Keccak-256 permutation and padding;
+- RLP integer/list encoding;
+- EIP-55 checksum generation;
+- CREATE deployer/nonce derivation;
+- CREATE2 salt width and init-code hashing;
+- JSON-RPC chain identity checks.
 
 ## Reporting
 
-Use GitHub private vulnerability reporting when available. Include the affected version or commit, a minimal program/seed reproduction, expected behavior, actual behavior, and an independent Solana SDK result when possible.
+Use GitHub private vulnerability reporting when available. Include the affected version or commit, minimal public inputs, expected result, actual result, and an independent reference implementation when possible.
 
-Do not publish real secrets in a report. Zynode never needs private keys or seed phrases, and some PDA seed material may also be sensitive.
+Do not include API keys or provider credentials in reports.
 
-## Network and dependency surface
+## RPC note
 
-The runtime package has no npm dependencies and production source is designed to make no network requests. Repository checks enforce this boundary. Development automation still depends on GitHub Actions and the Node.js toolchain, which should be reviewed like any other build infrastructure.
+Built-in Robinhood Chain public RPC endpoints are read-only destinations chosen for convenience. Users can pass `--rpc-url` to use their own infrastructure. Provider availability and rate limits are outside Zynode's control.

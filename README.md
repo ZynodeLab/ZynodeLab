@@ -1,271 +1,331 @@
 # Zynode Lab
 
-uBBKPVAbtGkVdg9Vz2T2XXQx1eHiwmEZW88pXjvpump
+Zynode Lab is a zero-runtime-dependency command-line toolkit for **Robinhood Chain** developers. It focuses on deterministic EVM contract deployment, exact CREATE and CREATE2 address prediction, recipe diagnostics, EIP-55 checksums, explorer links, and optional JSON-RPC checks against Robinhood Chain mainnet or testnet.
 
-Zynode Lab is an offline, zero-runtime-dependency Solana PDA engineering tool. It is built for the part of PDA work that usually causes bugs: exact seed bytes, canonical bump selection, cross-language encoding, and seed schemes that look different in source code but hash to the same effective payload.
+The tool is designed to be useful in deployment scripts, CI, audits, release checklists, and local development without requiring a wallet or private key.
 
-The repository ships a CLI and reusable ES modules. It does not contain a website, wallet connector, RPC client, database, telemetry SDK, or hosted API.
+> Zynode Lab is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Robinhood Markets, Inc. or its affiliates.
 
-## What makes it useful
+## Robinhood Chain network support
 
-Most PDA utilities stop after printing an address. Zynode Lab can also:
+| Network | Chain ID | Gas token | Public RPC | Explorer |
+| --- | ---: | --- | --- | --- |
+| Robinhood Chain | `4663` | ETH | `https://rpc.mainnet.chain.robinhood.com` | `https://robinhoodchain.blockscout.com` |
+| Robinhood Chain Testnet | `46630` | ETH | `https://rpc.testnet.chain.robinhood.com` | `https://explorer.testnet.chain.robinhood.com` |
 
-- derive canonical PDAs and bumps;
-- display exact bytes for typed seed inputs;
-- trace rejected on-curve bump candidates until the canonical bump is found;
-- inspect all 256 bump values;
-- verify a known PDA with a CI-friendly exit code;
-- detect Unicode normalization differences in string seeds;
-- warn about adjacent variable-width seed boundaries;
-- compare two PDA recipes and prove when different seed segmentations produce the same effective payload;
-- create two fingerprints: one for the typed recipe and one for the bytes that actually reach the PDA hash;
-- generate matching Solana Kit, web3.js, Rust, and Anchor snippets.
+Robinhood Chain is an Ethereum-compatible Layer 2 built on Arbitrum technology. Zynode uses standard EVM address rules, which means deterministic CREATE and CREATE2 calculations can be performed locally and then checked against Robinhood Chain when needed.
+
+## What it does
+
+- predicts CREATE addresses from deployer + nonce;
+- predicts CREATE2 addresses from deployer + salt + init code or init code hash;
+- implements Keccak-256 locally with test vectors;
+- implements the RLP path required by CREATE address derivation;
+- converts and validates EIP-55 addresses;
+- verifies predicted addresses with CI-friendly exit codes;
+- diagnoses common CREATE2 input mistakes;
+- fingerprints canonical deployment recipes;
+- compares two CREATE2 recipes;
+- generates deployment-address code for Solidity, ethers, Foundry, and this package;
+- prints canonical Robinhood Chain network configuration;
+- probes public or custom JSON-RPC endpoints;
+- inspects deployed code, balance, and nonce for an address;
+- builds mainnet and testnet explorer links;
+- works with no runtime npm dependencies.
 
 ## Requirements
 
-Node.js 20 or newer.
+- Node.js 20 or newer
 
-## Install from source
+## Install
+
+Run directly from a clone:
 
 ```bash
-git clone <your-repository-url>
-cd zynode-lab
-npm ci
+npm install
 npm test
-npm link
-```
-
-After `npm link`, run:
-
-```bash
-zynode help
-```
-
-You can also use the CLI directly:
-
-```bash
 node src/cli.js help
+```
+
+Install the CLI globally from the repository:
+
+```bash
+npm install -g .
+zynode help
 ```
 
 ## Quick start
 
-### Derive
+### Show Robinhood Chain configuration
 
 ```bash
-zynode derive \
-  --program 11111111111111111111111111111111 \
-  --seed string:helloWorld
+zynode network --network mainnet
 ```
 
-Expected deterministic fixture:
+Example output:
 
 ```text
-PDA   46GZzzetjCURsdFPb7rcnspbEMnCBXe9kpjrsZAkKb6X
-Bump  254
+Network       Robinhood Chain
+Chain ID      4663
+Chain ID hex  0x1237
+Gas token     ETH
+Public RPC    https://rpc.mainnet.chain.robinhood.com
+Explorer      https://robinhoodchain.blockscout.com
 ```
 
-### Inspect exact seed bytes
+### Predict a CREATE2 address
 
 ```bash
-zynode inspect --seed u64le:12345
+zynode create2 \
+  --deployer 0x0000000000000000000000000000000000000000 \
+  --salt 0x00 \
+  --init-code 0x00
 ```
+
+Expected address for this standard EIP-1014 vector:
 
 ```text
-Type    u64 LE
-Length  8 bytes
-Width   fixed
-Hex     39 30 00 00 00 00 00 00
+0x4D1A2e2bB4F88F0250f26Ffff098B0b30B26BF38
 ```
 
-### Trace canonical bump search
+A salt shorter than 32 bytes is left-padded. Text salts are explicit:
 
 ```bash
-zynode trace \
-  -p 11111111111111111111111111111111 \
-  -s string:helloWorld
+zynode create2 \
+  --deployer 0x1111111111111111111111111111111111111111 \
+  --salt utf8:zynode-v1 \
+  --init-code-hash 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
-The trace includes every candidate digest from bump 255 down to the first off-curve address. This is useful when debugging a client that reports the wrong bump or when validating a custom PDA implementation.
+### Predict a CREATE address
 
-### Verify a PDA in CI
+```bash
+zynode create \
+  --deployer 0x6ac7ea33f8831ea9dcc53393aaa88b25a785dbf0 \
+  --nonce 1
+```
+
+CREATE prediction uses:
+
+```text
+keccak256(rlp([deployer, nonce]))[12:]
+```
+
+### Checksum an address
+
+```bash
+zynode checksum \
+  --address 0x52908400098527886e0f7030069857d2e4169ee7
+```
+
+### Verify a predicted address in CI
 
 ```bash
 zynode verify \
-  -p 11111111111111111111111111111111 \
-  -s string:helloWorld \
-  --expect 46GZzzetjCURsdFPb7rcnspbEMnCBXe9kpjrsZAkKb6X
+  --method create2 \
+  --deployer 0x0000000000000000000000000000000000000000 \
+  --salt 0x00 \
+  --init-code 0x00 \
+  --expect 0x4D1A2e2bB4F88F0250f26Ffff098B0b30B26BF38
 ```
 
-Exit status is `0` for a match and `2` for a mismatch.
+Exit code is `0` for a match and `2` for an address mismatch.
 
-### Run the recipe doctor
+### Diagnose a CREATE2 recipe
 
 ```bash
 zynode doctor \
-  -p 11111111111111111111111111111111 \
-  -s string:profile \
-  -s string:user
+  --deployer 0x0000000000000000000000000000000000000000 \
+  --salt 0x00 \
+  --init-code 0x00
 ```
 
-The doctor checks encoding and schema footguns. It does not claim a PDA is insecure. It points out byte-level conditions that deserve review.
+The doctor reports conditions such as a zero deployer, all-zero salt, empty init code, explicit UTF-8 salt handling, short-salt padding, and checksum normalization.
 
-### Compare two recipes
-
-```bash
-zynode compare \
-  --left examples/segmentation-a.json \
-  --right examples/segmentation-b.json
-```
-
-The bundled examples deliberately use different seed boundaries that concatenate to the same bytes. Zynode reports whether the program, effective payload, typed recipe, canonical PDA, and seed boundaries match.
-
-### Fingerprint a derivation recipe
-
-```bash
-zynode fingerprint \
-  -p 11111111111111111111111111111111 \
-  -s string:profile \
-  -s u64le:42
-```
-
-Zynode emits:
-
-- `zynode-recipe-v1`: identifies the typed seed recipe, including type, endian choice, textual value, and exact bytes;
-- `zynode-payload-v1`: identifies the program ID plus concatenated user seed bytes, intentionally ignoring seed segmentation.
-
-These fingerprints are Zynode metadata, not Solana addresses and not a replacement for the canonical PDA.
-
-## Seed syntax
-
-Repeat `--seed` for each seed, in order.
-
-```text
-string:user
-pubkey:7x...
-base58:3MN5...
-hex:deadbeef
-u8:7
-u16le:500
-u16be:500
-u32le:123456
-u32be:123456
-u64le:12345
-u64be:12345
-```
-
-Each user seed is limited to 32 bytes. Canonical derivation accepts at most 15 user seeds because the one-byte bump occupies the final seed slot.
-
-## JSON recipe format
-
-`compare` reads small portable JSON recipes:
-
-```json
-{
-  "program": "11111111111111111111111111111111",
-  "seeds": [
-    "string:profile",
-    "u64le:42"
-  ]
-}
-```
-
-See [`docs/recipe-format.md`](docs/recipe-format.md).
-
-## Machine-readable output
-
-Commands that produce structured results support `--json`:
-
-```bash
-zynode trace \
-  -p 11111111111111111111111111111111 \
-  -s string:helloWorld \
-  --json
-```
-
-This makes Zynode suitable for scripts, test harnesses, release checks, and editor integrations.
-
-## Code generation
+### Generate code
 
 ```bash
 zynode code \
-  -p 11111111111111111111111111111111 \
-  -s string:user \
-  --target rust
+  --target solidity \
+  --deployer 0x1111111111111111111111111111111111111111 \
+  --salt 0x01 \
+  --init-code 0x60006000
 ```
 
 Targets:
 
 ```text
-kit
-web3
-rust
-anchor
+solidity
+ethers
+foundry
+node
 ```
 
-For non-string seeds, generated snippets prefer exact byte arrays. This keeps the output faithful to the inspected recipe even when a framework has several higher-level encoding helpers.
+### Probe Robinhood Chain RPC
 
-## Library usage
+```bash
+zynode rpc --network mainnet
+```
+
+This requests `eth_chainId`, `eth_blockNumber`, and `eth_gasPrice`, then verifies the returned chain ID against the built-in Robinhood Chain configuration.
+
+Public endpoints are rate-limited. For sustained production use, pass a provider endpoint:
+
+```bash
+zynode rpc \
+  --network mainnet \
+  --rpc-url https://YOUR_PROVIDER_ENDPOINT
+```
+
+### Inspect an address on-chain
+
+```bash
+zynode contract \
+  --network mainnet \
+  --address 0x1111111111111111111111111111111111111111
+```
+
+The command reads code, balance, and nonce only. It never signs or sends a transaction.
+
+### Build explorer links
+
+```bash
+zynode explorer --network mainnet --address 0x1111111111111111111111111111111111111111
+```
+
+or:
+
+```bash
+zynode explorer --network testnet --tx 0xYOUR_32_BYTE_TX_HASH
+```
+
+## JSON output
+
+Most commands support `--json`:
+
+```bash
+zynode create2 \
+  --deployer 0x0000000000000000000000000000000000000000 \
+  --salt 0x00 \
+  --init-code 0x00 \
+  --json
+```
+
+Big integers are serialized as decimal strings, making output safe for shells and JSON processors.
+
+## Library API
+
+The repository can also be used as an ES module:
 
 ```js
 import {
-  diagnoseRecipe,
-  findProgramAddress,
-  normalizeRecipe,
+  predictCreate2Address,
+  getNetwork,
+  toChecksumAddress,
 } from 'zynode-lab';
 
-const recipe = normalizeRecipe({
-  program: '11111111111111111111111111111111',
-  seeds: ['string:profile', 'u64le:42'],
+const deployment = predictCreate2Address({
+  deployer: '0x0000000000000000000000000000000000000000',
+  salt: '0x00',
+  initCode: '0x00',
 });
 
-const result = await findProgramAddress(
-  recipe.seeds.map((seed) => seed.bytes),
-  recipe.program,
-);
-
-const diagnostics = await diagnoseRecipe(recipe);
-
-console.log(result.address, result.bump);
-console.log(diagnostics.findings);
+console.log(deployment.address);
+console.log(getNetwork('mainnet').chainId);
+console.log(toChecksumAddress(deployment.address));
 ```
 
-## Why seed boundaries matter
-
-Solana hashes PDA seeds sequentially. Seed boundaries are not length-framed in the PDA hash input. For a single program ID, different seed arrays can therefore be algorithmically equivalent when their concatenated bytes are identical. Solana's Rust documentation explicitly warns about this class of collision.
-
-Zynode's `doctor` and `compare` commands make that property visible instead of treating every seed list as a distinct byte payload.
-
-See [`docs/seed-boundaries.md`](docs/seed-boundaries.md).
-
-## Repository structure
+Exports are also available as:
 
 ```text
-zynode-lab/
-├── src/
-│   ├── cli.js
-│   ├── cli/
-│   │   ├── args.js
-│   │   ├── recipes.js
-│   │   ├── render.js
-│   │   └── run.js
-│   ├── version.js
-│   └── lib/
-│       ├── base58.js
-│       ├── bytes.js
-│       ├── diagnostics.js
-│       ├── ed25519.js
-│       ├── errors.js
-│       ├── generators.js
-│       ├── hash.js
-│       ├── index.js
-│       ├── pda.js
-│       ├── recipe.js
-│       └── seeds.js
-├── examples/
-├── tests/
-├── scripts/
-├── docs/
-└── .github/
+zynode-lab/address
+zynode-lab/create
+zynode-lab/create2
+zynode-lab/network
+zynode-lab/rpc
+zynode-lab/generators
+```
+
+## CREATE2 formula
+
+Zynode follows the standard EVM CREATE2 preimage:
+
+```text
+0xff ++ deployer ++ salt(bytes32) ++ keccak256(init_code)
+```
+
+The final contract address is the last 20 bytes of the Keccak-256 digest.
+
+Zynode accepts either the full initialization code or an already-computed 32-byte init code hash. If both are provided, the tool verifies that they match.
+
+## Recipe files
+
+A CREATE2 recipe can be stored as JSON:
+
+```json
+{
+  "method": "CREATE2",
+  "deployer": "0x0000000000000000000000000000000000000000",
+  "salt": "0x00",
+  "initCode": "0x00"
+}
+```
+
+See [`docs/recipe-format.md`](docs/recipe-format.md).
+
+Compare two recipes:
+
+```bash
+zynode compare \
+  --left examples/create2.json \
+  --right examples/create2-alt.json
+```
+
+## Security model
+
+Zynode is not a wallet and does not need:
+
+- private keys;
+- seed phrases;
+- transaction signatures;
+- custody permissions;
+- signing RPC methods.
+
+Local derivation commands do not make network requests. `rpc` and `contract` are read-only network commands and accept a custom endpoint.
+
+For correctness-sensitive code, the test suite includes standard Keccak-256 vectors, EIP-55 checksum vectors, EIP-1014 CREATE2 vectors, and known CREATE address fixtures.
+
+See [`SECURITY.md`](SECURITY.md).
+
+## Repository layout
+
+```text
+src/
+  cli.js
+  cli/
+    args.js
+    recipes.js
+    render.js
+    run.js
+  lib/
+    address.js
+    bytes.js
+    create.js
+    create2.js
+    diagnostics.js
+    generators.js
+    index.js
+    keccak.js
+    network.js
+    recipe.js
+    rlp.js
+    rpc.js
+
+tests/
+examples/
+docs/
+scripts/
+.github/workflows/
 ```
 
 ## Development
@@ -274,32 +334,19 @@ zynode-lab/
 npm run check
 npm test
 npm run smoke
-npm run doctor:fixture
-npm run compare:fixture
 npm run ci
 npm run release:check
 ```
 
-The test suite uses Node's built-in test runner. The runtime package has no npm dependencies.
+The repository intentionally has no runtime dependencies. This keeps the derivation surface small and makes releases easy to audit.
 
-## Security model
+## Reference material
 
-Zynode performs local deterministic computation. It never needs a private key, seed phrase, wallet connection, or RPC endpoint. Do not put secrets into CLI arguments or example recipes. PDA seeds can themselves be sensitive depending on the application.
-
-Correctness risks are concentrated in byte encoding, Ed25519 curve rejection, canonical bump selection, and generated-code fidelity. See [`SECURITY.md`](SECURITY.md).
-
-## Documentation
-
-- [`docs/algorithm.md`](docs/algorithm.md)
-- [`docs/architecture.md`](docs/architecture.md)
-- [`docs/seed-boundaries.md`](docs/seed-boundaries.md)
-- [`docs/recipe-format.md`](docs/recipe-format.md)
-- [`docs/release-checklist.md`](docs/release-checklist.md)
-
-## References
-
-- Solana PDA documentation: https://solana.com/docs/core/pda
-- Solana SDK `Pubkey` documentation: https://docs.rs/solana-sdk/latest/solana_sdk/pubkey/struct.Pubkey.html
+- Robinhood Chain documentation: `https://docs.robinhood.com/chain`
+- Robinhood Chain network connection guide: `https://docs.robinhood.com/chain/connecting/`
+- Robinhood Chain deployment guide: `https://docs.robinhood.com/chain/deploy-smart-contracts/`
+- EIP-1014 CREATE2 specification: `https://eips.ethereum.org/EIPS/eip-1014`
+- Ethereum RLP documentation: `https://ethereum.org/developers/docs/data-structures-and-encoding/rlp/`
 
 ## License
 

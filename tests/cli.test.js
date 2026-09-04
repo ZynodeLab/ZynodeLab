@@ -1,51 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, '..');
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cli = join(root, 'src', 'cli.js');
-const SYSTEM = '11111111111111111111111111111111';
-const EXPECTED = '46GZzzetjCURsdFPb7rcnspbEMnCBXe9kpjrsZAkKb6X';
+function run(args) { return spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' }); }
 
-function run(args) {
-  return spawnSync(process.execPath, [cli, ...args], { cwd: root, encoding: 'utf8' });
-}
-
-test('derive command emits canonical fixture', () => {
-  const result = run(['derive', '-p', SYSTEM, '-s', 'string:helloWorld']);
+test('network command identifies Robinhood Chain mainnet', () => {
+  const result = run(['network']);
   assert.equal(result.status, 0);
-  assert.match(result.stdout, new RegExp(EXPECTED));
-  assert.match(result.stdout, /254/);
+  assert.match(result.stdout, /Robinhood Chain/);
+  assert.match(result.stdout, /4663/);
 });
 
-test('verify command returns zero for a match', () => {
-  const result = run(['verify', '-p', SYSTEM, '-s', 'string:helloWorld', '--expect', EXPECTED]);
+test('create2 command emits EIP-1014 fixture', () => {
+  const result = run(['create2', '--deployer', '0x0000000000000000000000000000000000000000', '--salt', '0x00', '--init-code', '0x00']);
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /Match\s+yes/);
+  assert.match(result.stdout, /0x4D1A2e2bB4F88F0250f26Ffff098B0b30B26BF38/);
 });
 
-test('verify command returns two for a mismatch', () => {
-  const result = run(['verify', '-p', SYSTEM, '-s', 'string:helloWorld', '--expect', SYSTEM]);
+test('verify returns 2 for mismatch', () => {
+  const result = run(['verify', '--deployer', '0x0000000000000000000000000000000000000000', '--salt', '0x00', '--init-code', '0x00', '--expect', '0x0000000000000000000000000000000000000000']);
   assert.equal(result.status, 2);
-  assert.match(result.stdout, /Match\s+no/);
 });
 
-test('trace exposes rejected bump attempts before canonical bump', () => {
-  const result = run(['trace', '-p', SYSTEM, '-s', 'string:helloWorld', '--json']);
+test('checksum command emits EIP-55 form', () => {
+  const result = run(['checksum', '--address', '0x52908400098527886e0f7030069857d2e4169ee7']);
   assert.equal(result.status, 0);
-  const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.canonical.bump, 254);
-  assert.equal(parsed.attempts.length, 2);
-  assert.equal(parsed.attempts[0].bump, 255);
-  assert.equal(parsed.attempts[0].status, 'on-curve');
-});
-
-test('compare identifies equivalent segmentation fixtures', () => {
-  const result = run(['compare', '--left', 'examples/segmentation-a.json', '--right', 'examples/segmentation-b.json', '--json']);
-  assert.equal(result.status, 0);
-  const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.segmentationEquivalent, true);
+  assert.match(result.stdout, /0x52908400098527886E0F7030069857D2E4169EE7/);
 });

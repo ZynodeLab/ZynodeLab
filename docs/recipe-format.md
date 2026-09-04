@@ -1,48 +1,40 @@
 # Recipe format
 
-A Zynode recipe is intentionally small and portable.
+Zynode recipes are small JSON objects used for reproducible deterministic deployment checks.
+
+## CREATE2
 
 ```json
 {
-  "program": "11111111111111111111111111111111",
-  "seeds": [
-    "string:profile",
-    "pubkey:...",
-    "u64le:42"
-  ]
+  "method": "CREATE2",
+  "deployer": "0x0000000000000000000000000000000000000000",
+  "salt": "0x00",
+  "initCode": "0x00"
 }
 ```
 
-## Fields
+`deployer` must be a 20-byte EVM address.
 
-`program` is a base58 Solana public key that decodes to 32 bytes.
+`salt` may be hexadecimal or `utf8:TEXT`. Zynode normalizes it to 32 bytes by left-padding.
 
-`seeds` is an ordered array using the same `TYPE:VALUE` syntax as the CLI. Seed order is part of the derivation recipe.
+Provide `initCode`, `initCodeHash`, or both. If both are present, `keccak256(initCode)` must equal `initCodeHash`.
 
-Supported types:
+## CREATE
 
-```text
-string
-pubkey
-base58
-hex
-u8
-u16le
-u16be
-u32le
-u32be
-u64le
-u64be
+```json
+{
+  "method": "CREATE",
+  "deployer": "0x6ac7ea33f8831ea9dcc53393aaa88b25a785dbf0",
+  "nonce": "1"
+}
 ```
 
-## Intentional omissions
+Nonce may be stored as a decimal string or a `0x`-prefixed hexadecimal string.
 
-The format does not store a bump. Canonical bump selection is derived from the program and user seeds.
+## Fingerprint
 
-The format does not store a PDA. Use `zynode verify` if an expected PDA needs to be asserted.
+The CREATE2 fingerprint command canonicalizes the recipe and hashes the canonical JSON with Keccak-256. The fingerprint is Zynode metadata and is not part of the EVM protocol.
 
-The format does not include private keys, wallet metadata, RPC URLs, or network names. PDA derivation depends on the program ID and exact seed bytes, not on an RPC cluster label.
+## Security
 
-## Safety
-
-Recipe files are plain text. Do not place sensitive seed material in a repository merely because it is used as a PDA seed.
+Recipes are plain text. They should never contain private keys, seed phrases, API keys, or credentials. Deterministic deployment calculations only require public deployment inputs.

@@ -1,35 +1,20 @@
-import { formatSeedLabel } from '../lib/seeds.js';
+function printable(value) {
+  return typeof value === 'bigint' ? value.toString() : value;
+}
 
 export function printJson(value) {
-  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(value, (_, item) => printable(item), 2)}\n`);
 }
 
-export function renderPreparedSeeds(seeds) {
-  return seeds.map((seed, index) => ({
-    index: index + 1,
-    type: formatSeedLabel(seed),
-    value: seed.value,
-    byteLength: seed.bytes.length,
-    hex: seed.hex,
-  }));
-}
-
-export function printKeyValues(entries) {
-  const width = Math.max(...entries.map(([key]) => key.length));
-  for (const [key, value] of entries) {
-    process.stdout.write(`${key.padEnd(width)}  ${value}\n`);
-  }
+export function printKeyValues(rows) {
+  const width = Math.max(...rows.map(([label]) => label.length));
+  for (const [label, value] of rows) process.stdout.write(`${label.padEnd(width)}  ${printable(value)}\n`);
 }
 
 export function printFindings(findings) {
-  if (findings.length === 0) {
-    process.stdout.write('Findings  none\n');
+  if (!findings.length) {
+    process.stdout.write('No findings.\n');
     return;
   }
-  for (const finding of findings) {
-    const location = Number.isInteger(finding.seedIndex) ? ` seed ${finding.seedIndex + 1}` : '';
-    process.stdout.write(`${finding.level.toUpperCase().padEnd(7)} ${finding.code}${location}\n`);
-    process.stdout.write(`        ${finding.message}\n`);
-    if (finding.details) process.stdout.write(`        ${JSON.stringify(finding.details)}\n`);
-  }
+  for (const finding of findings) process.stdout.write(`${finding.severity.toUpperCase().padEnd(7)} ${finding.code.padEnd(16)} ${finding.message}\n`);
 }

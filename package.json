@@ -1,0 +1,45 @@
+{
+  "name": "zynode-lab",
+  "version": "1.2.0",
+  "description": "Zero-dependency Solana PDA CLI for exact-byte derivation, recipe diagnostics, bump tracing, verification, and code generation.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "solana",
+    "pda",
+    "program-derived-address",
+    "anchor",
+    "cli",
+    "seed-debugging",
+    "developer-tools"
+  ],
+  "bin": {
+    "zynode": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check.mjs",
+    "smoke": "node src/cli.js derive -p 11111111111111111111111111111111 -s string:helloWorld",
+    "doctor:fixture": "node src/cli.js doctor -p 11111111111111111111111111111111 -s string:profile -s string:user",
+    "compare:fixture": "node src/cli.js compare --left examples/segmentation-a.json --right examples/segmentation-b.json",
+    "ci": "npm run check && npm test && npm run smoke && npm run doctor:fixture",
+    "release:check": "npm run ci && npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/lib/index.js",
+    "./pda": "./src/lib/pda.js",
+    "./seeds": "./src/lib/seeds.js",
+    "./diagnostics": "./src/lib/diagnostics.js",
+    "./recipe": "./src/lib/recipe.js",
+    "./generators": "./src/lib/generators.js"
+  }
+}
